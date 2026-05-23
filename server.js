@@ -97,17 +97,13 @@ app.get('/api/settings', async (req, res) => {
 app.post('/api/settings', async (req, res) => {
   try {
     const { cmdLimit, cmdMaxGauge, powerLimit, powerMaxGauge } = req.body;
-    let settings = await Settings.findOne();
-    if (!settings) {
-      settings = new Settings();
-    }
-    if (cmdLimit !== undefined) settings.cmdLimit = cmdLimit;
-    if (cmdMaxGauge !== undefined) settings.cmdMaxGauge = cmdMaxGauge;
-    if (powerLimit !== undefined) settings.powerLimit = powerLimit;
-    if (powerMaxGauge !== undefined) settings.powerMaxGauge = powerMaxGauge;
-    
-    await settings.save();
-    res.status(200).json({ message: 'Settings updated successfully', settings });
+    // Use findOneAndUpdate with upsert to ensure a document always exists and return the new version
+    const updated = await Settings.findOneAndUpdate(
+      {}, // match any existing document
+      { $set: { cmdLimit, cmdMaxGauge, powerLimit, powerMaxGauge } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    res.status(200).json({ message: 'Settings updated successfully', settings: updated });
   } catch (error) {
     console.error('Error updating settings:', error.message);
     res.status(500).json({ error: 'Failed to update settings' });
