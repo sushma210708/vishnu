@@ -6,6 +6,7 @@ const admin = require('firebase-admin');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const Settings = require('./models/Settings');
+const AlertHistory = require('./models/AlertHistory');
 
 
 const app = express();
@@ -33,11 +34,12 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://13.233.76.8:5555/ricemill';
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(async () => {
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ricemill';
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI not defined in .env');
+  process.exit(1);
+}
+mongoose.connect(MONGODB_URI).then(async () => {
   console.log('✅ Connected to MongoDB');
   
   // Initialize default settings if none exist
@@ -109,6 +111,30 @@ app.post('/api/settings', async (req, res) => {
   } catch (error) {
     console.error('Error updating settings:', error.message);
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// Get alert history
+app.get('/api/alerts', async (req, res) => {
+  try {
+    const alerts = await AlertHistory.find().sort({ timestamp: -1 }).limit(50);
+    res.status(200).json(alerts);
+  } catch (error) {
+    console.error('Error fetching alerts:', error.message);
+    res.status(500).json({ error: 'Failed to fetch alerts' });
+  }
+});
+
+// Record a new alert
+app.post('/api/alerts', async (req, res) => {
+  try {
+    const { message, type, value, limit } = req.body;
+    const newAlert = new AlertHistory({ message, type, value, limit });
+    await newAlert.save();
+    res.status(201).json({ message: 'Alert recorded successfully', alert: newAlert });
+  } catch (error) {
+    console.error('Error recording alert:', error.message);
+    res.status(500).json({ error: 'Failed to record alert' });
   }
 });
 
